@@ -1,6 +1,7 @@
 """
 database.py — Google Sheets + Cloudinary integration
 Handles: connect, append rows, fetch records as DataFrame, upload images to Cloudinary.
+Works on both local (.env) and Streamlit Cloud (st.secrets).
 """
 
 import os
@@ -36,9 +37,25 @@ COLUMN_HEADERS = [
 ]
 
 
+# ── Secret helpers ─────────────────────────────────────────────────────────────
+def _get_secret(key: str, default: str = "") -> str:
+    """
+    Read a secret from st.secrets (Streamlit Cloud) or os.getenv (local .env).
+    Streamlit Cloud takes priority; falls back to .env for local development.
+    """
+    try:
+        import streamlit as st
+        val = st.secrets.get(key, None)
+        if val:
+            return str(val).strip()
+    except Exception:
+        pass
+    return os.getenv(key, default).strip()
+
+
 # ── Google credentials ─────────────────────────────────────────────────────────
 def _get_credentials() -> Credentials:
-    creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    creds_json = _get_secret("GOOGLE_SERVICE_ACCOUNT_JSON")
     if creds_json:
         try:
             creds_dict = json.loads(creds_json)
@@ -46,7 +63,7 @@ def _get_credentials() -> Credentials:
             raise ValueError(f"GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON: {e}")
         return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 
-    creds_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "service_account.json")
+    creds_file = _get_secret("GOOGLE_SERVICE_ACCOUNT_FILE", "service_account.json")
     if os.path.exists(creds_file):
         return Credentials.from_service_account_file(creds_file, scopes=SCOPES)
 
@@ -63,13 +80,13 @@ def _get_gspread_client() -> gspread.Client:
 
 # ── Cloudinary image upload ────────────────────────────────────────────────────
 def _configure_cloudinary():
-    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
-    api_key    = os.getenv("CLOUDINARY_API_KEY", "").strip()
-    api_secret = os.getenv("CLOUDINARY_API_SECRET", "").strip()
+    cloud_name = _get_secret("CLOUDINARY_CLOUD_NAME")
+    api_key    = _get_secret("CLOUDINARY_API_KEY")
+    api_secret = _get_secret("CLOUDINARY_API_SECRET")
 
     if not all([cloud_name, api_key, api_secret]):
         raise ValueError(
-            "Cloudinary credentials missing. Add to .env:\n"
+            "Cloudinary credentials missing. Add to .env or Streamlit secrets:\n"
             "  CLOUDINARY_CLOUD_NAME\n"
             "  CLOUDINARY_API_KEY\n"
             "  CLOUDINARY_API_SECRET"
@@ -98,8 +115,7 @@ def upload_image_to_cloudinary(image_bytes: bytes, filename: str, mime_type: str
     try:
         _configure_cloudinary()
 
-        # Build a clean public_id: union_grievances/UPS-00123_2024-01-15_form
-        base = filename.rsplit(".", 1)[0]  # strip extension
+        base = filename.rsplit(".", 1)[0]
         public_id = f"union_grievances/{base}"
 
         result = cloudinary.uploader.upload(
@@ -133,7 +149,6 @@ def _get_or_create_sheet() -> gspread.Worksheet:
     if not existing:
         worksheet.append_row(COLUMN_HEADERS, value_input_option="RAW")
     elif existing[0] != COLUMN_HEADERS:
-        # Migrate old sheets that predate the image_url column
         worksheet.delete_rows(1)
         worksheet.insert_row(COLUMN_HEADERS, index=1)
 
@@ -231,14 +246,12 @@ def delete_record_by_employee_id(employee_id: str) -> int:
 if __name__ == "__main__":
     print("Testing Google Sheets + Cloudinary connection...\n")
 
-    # Test Sheets
     try:
         worksheet = _get_or_create_sheet()
         print(f"✓ Sheets connected: {worksheet.spreadsheet.title}")
     except Exception as e:
         print(f"✗ Sheets failed: {e}")
 
-    # Test Cloudinary upload with a tiny 1x1 PNG
     try:
         import base64
         tiny_png = base64.b64decode(
@@ -251,26 +264,3 @@ if __name__ == "__main__":
             print("✗ Cloudinary upload returned None")
     except Exception as e:
         print(f"✗ Cloudinary failed: {e}")
-
-    # Test full record append
-    try:
-        test_record = {
-            "timestamp":        "2024-01-01 12:00:00",
-            "employee_name":    "Test Employee",
-            "employee_id":      "TEST-001",
-            "date":             "2024-01-01",
-            "case_type":        "Grievance",
-            "article_violated": "Article 99",
-            "description":      "Test record — safe to delete.",
-            "source_file":      "test_upload.png",
-            "image_url":        url or "",
-        }
-        success = append_record(test_record)
-        print(f"✓ Append test: {'SUCCESS' if success else 'FAILED'}")
-
-        df = get_all_records()
-        print(f"✓ Fetch test: {len(df)} records found")
-        if not df.empty:
-            print(df[["employee_name", "image_url"]].head())
-    except Exception as e:
-        print(f"✗ Append/fetch failed: {e}")

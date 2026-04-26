@@ -284,7 +284,7 @@ def check_password():
             st.markdown('<p style="font-family: IBM Plex Mono; font-size: 0.7rem; color: #8888AA; letter-spacing: 2px; text-transform: uppercase;">Access Code</p>', unsafe_allow_html=True)
             pwd = st.text_input("Access Code", type="password", placeholder="Enter access code", label_visibility="collapsed")
             if st.button("AUTHENTICATE", type="primary", use_container_width=True):
-                correct = os.getenv("APP_PASSWORD", "union2024")
+                correct = st.secrets.get("APP_PASSWORD", os.getenv("APP_PASSWORD", "union2024")) if hasattr(st, "secrets") else os.getenv("APP_PASSWORD", "union2024")
                 if pwd == correct:
                     st.session_state.authenticated = True
                     st.rerun()
