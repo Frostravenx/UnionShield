@@ -620,6 +620,8 @@ with tab2:
         """, unsafe_allow_html=True)
     else:
         # Display table + detail view
+        # Force all columns to string to avoid Arrow type errors
+        filtered = filtered.astype(str)
         display_cols = [c for c in ["timestamp", "employee_name", "employee_id", "date", "case_type", "article_violated"] if c in filtered.columns]
 
         if display_cols:
