@@ -45,7 +45,7 @@ st.markdown("""
 }
 
 /* Hide default Streamlit elements */
-#MainMenu, footer, header { visibility: hidden; }
+#MainMenu, footer { visibility: hidden; }
 .stDeployButton { display: none; }
 
 /* Sidebar */
@@ -285,7 +285,7 @@ if not check_password():
                     background: rgba(212,160,23,0.08);
                     border: 1px solid rgba(212,160,23,0.2); padding: 12px 20px;
                     border-radius: 3px; color: #8888AA;">
-            ☰ Open the menu to sign in
+            ← Click the arrow in the top-left to sign in
         </div>
     </div>
     """, unsafe_allow_html=True)
