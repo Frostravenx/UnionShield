@@ -283,7 +283,7 @@ def check_password():
         if not st.session_state.authenticated:
             st.markdown('<p style="font-family: IBM Plex Mono; font-size: 0.7rem; color: #8888AA; letter-spacing: 2px; text-transform: uppercase;">Access Code</p>', unsafe_allow_html=True)
             pwd = st.text_input("Access Code", type="password", placeholder="Enter access code", label_visibility="collapsed")
-            if st.button("AUTHENTICATE", type="primary", use_container_width=True):
+            if st.button("AUTHENTICATE", type="primary", width='stretch'):
                 correct = st.secrets.get("APP_PASSWORD", os.getenv("APP_PASSWORD", "union2024")) if hasattr(st, "secrets") else os.getenv("APP_PASSWORD", "union2024")
                 if pwd == correct:
                     st.session_state.authenticated = True
@@ -320,7 +320,7 @@ def check_password():
                 st.markdown('<p style="font-family: IBM Plex Mono; font-size: 0.7rem; color: #8888AA;">Connect Google Sheets to see stats</p>', unsafe_allow_html=True)
 
             st.markdown("<hr>", unsafe_allow_html=True)
-            if st.button("SIGN OUT", use_container_width=True):
+            if st.button("SIGN OUT", width='stretch'):
                 st.session_state.authenticated = False
                 st.rerun()
             return True
@@ -384,7 +384,7 @@ with tab1:
         )
 
         if uploaded_file:
-            st.image(uploaded_file, caption="Uploaded Form", use_container_width=True)
+            st.image(uploaded_file, caption="Uploaded Form", width='stretch')
             st.markdown(f"""
             <div style="font-family: IBM Plex Mono; font-size: 0.68rem; color: #8888AA;
                         margin-top: 8px; padding: 8px 12px; background: rgba(255,255,255,0.03);
@@ -393,7 +393,7 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
 
-            if "extracted" not in st.session_state or st.button("🔄 RE-EXTRACT WITH AI", use_container_width=True):
+            if "extracted" not in st.session_state or st.button("🔄 RE-EXTRACT WITH AI", width='stretch'):
                 with st.spinner("⚡ Gemini AI extracting data..."):
                     try:
                         from processor import extract_form_data
@@ -456,7 +456,7 @@ with tab1:
 
         save_col, clear_col = st.columns([3, 1])
         with save_col:
-            if st.button("💾  SAVE TO GOOGLE SHEETS", type="primary", use_container_width=True):
+            if st.button("💾  SAVE TO GOOGLE SHEETS", type="primary", width='stretch'):
                 if not emp_name or not emp_id or not inc_date:
                     st.error("Employee Name, ID, and Date are required fields.")
                 else:
@@ -519,7 +519,7 @@ with tab1:
                         st.error(f"Save error: {e}")
 
         with clear_col:
-            if st.button("🗑  CLEAR", use_container_width=True):
+            if st.button("🗑  CLEAR", width='stretch'):
                 st.session_state.pop("extracted", None)
                 st.rerun()
 
@@ -582,7 +582,7 @@ with tab2:
     with search_col:
         search = st.text_input("Search", placeholder="🔍  Search by employee name or ID...", label_visibility="collapsed")
     with filter_col:
-        type_filter = st.selectbox("", ["All Types", "Grievance", "Discipline", "Arbitration", "Other"], label_visibility="collapsed")
+        type_filter = st.selectbox("Filter by Type", ["All Types", "Grievance", "Discipline", "Arbitration", "Other"], label_visibility="collapsed")
 
     # Apply filters
     filtered = df.copy()
@@ -629,7 +629,7 @@ with tab2:
                     "employee_id": "Employee ID", "date": "Date",
                     "case_type": "Type", "article_violated": "Article"
                 }),
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
             )
 
