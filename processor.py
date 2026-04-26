@@ -1,22 +1,17 @@
 """
-processor.py — Gemini 1.5 Flash image extraction module
+processor.py — Gemini image extraction module
 Sends grievance/disciplinary form images to Gemini and returns structured JSON.
+Uses the new google.genai package (replaces deprecated google.generativeai).
 """
 
 import os
 import json
 import re
-import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── Configure Gemini ───────────────────────────────────────────────────────────
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
-MODEL_NAME = "gemini-3.1-flash-lite-preview"
+MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"
 
 SYSTEM_PROMPT = """You are an expert legal secretary for a labor union. 
 Extract the following fields from this form into a strict JSON format:
@@ -38,45 +33,56 @@ Example output:
 {"employee_name": "John Smith", "employee_id": "UPS-00123", "date": "2024-01-15", "case_type": "Grievance", "article_violated": "Article 37", "description": "Employee was forced to work overtime without authorization."}"""
 
 
+def _get_api_key() -> str:
+    """Get Gemini API key from st.secrets or .env."""
+    try:
+        import streamlit as st
+        val = st.secrets.get("GEMINI_API_KEY", None)
+        if val:
+            return str(val).strip()
+    except Exception:
+        pass
+    return os.getenv("GEMINI_API_KEY", "").strip()
+
+
 def extract_form_data(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
     """
-    Send an image to Gemini 1.5 Flash and extract structured form data.
-    
+    Send an image to Gemini and extract structured form data.
+
     Args:
         image_bytes: Raw image bytes
-        mime_type: MIME type of the image (image/jpeg or image/png)
-    
+        mime_type:   MIME type of the image (image/jpeg or image/png)
+
     Returns:
         dict with keys: employee_name, employee_id, date, case_type,
                         article_violated, description
-    
+
     Raises:
         ValueError: If API key is not configured
-        Exception: On API or parsing errors
+        Exception:  On API or parsing errors
     """
-    if not GEMINI_API_KEY:
+    from google import genai
+    from google.genai import types
+
+    api_key = _get_api_key()
+    if not api_key:
         raise ValueError(
-            "GEMINI_API_KEY not found in environment. "
-            "Please add it to your .env file."
+            "GEMINI_API_KEY not found. "
+            "Add it to your .env file or Streamlit secrets."
         )
 
-    model = genai.GenerativeModel(
-        model_name=MODEL_NAME,
-        generation_config={
-            "temperature": 0.1,   # Low temp for more deterministic extraction
-            "top_p": 0.95,
-            "max_output_tokens": 1024,
-        }
-    )
+    client = genai.Client(api_key=api_key)
 
-    # Build the content parts — image + instruction
-    image_part = {
-        "mime_type": mime_type,
-        "data": image_bytes
-    }
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
 
-    response = model.generate_content(
-        [SYSTEM_PROMPT, image_part],
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=[SYSTEM_PROMPT, image_part],
+        config=types.GenerateContentConfig(
+            temperature=0.1,
+            top_p=0.95,
+            max_output_tokens=1024,
+        ),
     )
 
     raw_text = response.text.strip()
@@ -90,16 +96,16 @@ def extract_form_data(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict
     try:
         data = json.loads(raw_text)
     except json.JSONDecodeError as e:
-        # Attempt to extract JSON object from text
         match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if match:
             data = json.loads(match.group())
         else:
-            raise ValueError(f"Gemini did not return valid JSON. Raw response: {raw_text[:500]}") from e
+            raise ValueError(
+                f"Gemini did not return valid JSON. Raw response: {raw_text[:500]}"
+            ) from e
 
     # Ensure all required keys exist
-    required_keys = ["employee_name", "employee_id", "date", "case_type", "article_violated", "description"]
-    for key in required_keys:
+    for key in ["employee_name", "employee_id", "date", "case_type", "article_violated", "description"]:
         if key not in data:
             data[key] = ""
 
@@ -111,26 +117,15 @@ def extract_form_data(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict
     return data
 
 
-def test_extraction():
-    """Quick test using a sample image path. Run directly: python processor.py"""
-    import sys
-    if len(sys.argv) < 2:
-        print("Usage: python processor.py <image_path>")
-        print("\nEnvironment check:")
-        print(f"  GEMINI_API_KEY: {'✓ Set' if GEMINI_API_KEY else '✗ NOT SET — add to .env'}")
-        return
-
-    image_path = sys.argv[1]
-    print(f"Processing: {image_path}")
-
-    mime = "image/png" if image_path.lower().endswith(".png") else "image/jpeg"
-    with open(image_path, "rb") as f:
-        image_bytes = f.read()
-
-    result = extract_form_data(image_bytes, mime)
-    print("\nExtracted data:")
-    print(json.dumps(result, indent=2))
-
-
 if __name__ == "__main__":
-    test_extraction()
+    import sys
+    api_key = _get_api_key()
+    print(f"GEMINI_API_KEY: {'✓ Set' if api_key else '✗ NOT SET'}")
+    print(f"Model: {MODEL_NAME}")
+
+    if len(sys.argv) >= 2:
+        image_path = sys.argv[1]
+        mime = "image/png" if image_path.lower().endswith(".png") else "image/jpeg"
+        with open(image_path, "rb") as f:
+            result = extract_form_data(f.read(), mime)
+        print(json.dumps(result, indent=2))

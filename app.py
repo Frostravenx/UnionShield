@@ -556,7 +556,7 @@ with tab2:
     except Exception as e:
         db_connected = False
         df = None
-        st.warning(f"Database connection error: {e}")
+        st.error(f"Database connection error: {e}")
 
     if not db_connected or df is None or df.empty:
         # Demo data fallback
