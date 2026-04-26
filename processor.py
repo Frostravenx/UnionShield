@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"
+MODEL_NAME = "gemini-3.1-flash-lite-preview"
 
 SYSTEM_PROMPT = """You are an expert legal secretary for a labor union. 
 Extract the following fields from this form into a strict JSON format:
